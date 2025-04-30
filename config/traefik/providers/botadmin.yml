@@ -1,0 +1,22 @@
+http:
+  routers:
+    botadmin:
+      rule: 'Host(`botadmin.{{env "APP_HOSTNAME"}}`)'
+      service: botadmin
+      entryPoints:
+        - "websecure"
+      middlewares:
+        - "compressResponse"
+      tls:
+        certResolver: "letsencrypt"
+
+  services:
+    botadmin:
+      loadBalancer:
+        servers:
+          - url: "http://botadmin"
+
+  middlewares:
+    compressResponse:
+      compress:
+        minResponseBodyBytes: 1024

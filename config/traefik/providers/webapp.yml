@@ -1,0 +1,22 @@
+http:
+  routers:
+    webapp:
+      rule: 'Host(`{{env "APP_HOSTNAME"}}`)'
+      service: webapp
+      entryPoints:
+        - "websecure"
+      middlewares:
+        - "compressResponse"
+      tls:
+        certResolver: "letsencrypt"
+
+  services:
+    webapp:
+      loadBalancer:
+        servers:
+          - url: "http://webapp"
+
+  middlewares:
+    compressResponse:
+      compress:
+        minResponseBodyBytes: 1024

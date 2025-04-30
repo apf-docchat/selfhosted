@@ -1,0 +1,285 @@
+services:
+  traefik:
+    image: "traefik:3.3"
+    container_name: "traefik"
+    volumes:
+      - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./config/traefik/providers:/etc/traefik/providers:ro
+      - ./mounted_data/traefik/letsencrypt:/letsencrypt
+    environment:
+      APP_HOSTNAME: ${APP_HOSTNAME}
+      API_HOSTNAME: ${API_HOSTNAME}
+    healthcheck:
+      test: [ "CMD", "traefik", "healthcheck" ]
+      start_period: 20s
+      timeout: 10s
+      retries: 5
+    ports:
+      - "80:80"
+      - "443:443"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  mysql:
+    image: mysql:8
+    volumes:
+      - ./config/mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./mounted_data/mysql:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=app
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=app_user
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "--host=127.0.0.1", "--user=app_user", "--password=app_user" ]
+      start_period: 10s
+      timeout: 10s
+    ports:
+      - "127.0.0.1:3306:3306"
+    restart: always
+
+  mongodb:
+    image: mongo:7
+    volumes:
+      - ./config/mongodb/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./mounted_data/mongodb:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "[ $$(mongosh --username=root --password=$MONGODB_ROOT_PASSWORD --eval \"db.adminCommand('serverStatus').ok\" --quiet) = '1' ]" ]
+      start_period: 30s
+      timeout: 10s
+    ports:
+      - "127.0.0.1:27017:27017"
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - ./config/redis:/usr/local/etc/redis:rw # Needs to be writable according to docs
+      - ./mounted_data/redis:/data
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: [ "CMD-SHELL", "[ $$(redis-cli ping) = 'PONG' ]" ]
+      start_period: 10s
+      timeout: 5s
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: always
+
+  webapp:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/webapp:${WEBAPP_IMAGE_TAG}
+    volumes:
+      - ./config/webapp/nginx_vhost_default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./config/webapp/envconfig.json:/usr/share/nginx/html/assets/envconfig.json:ro
+    restart: always
+
+  api:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/api:${API_IMAGE_TAG}
+    volumes:
+      - ./config/api/gunicorn.conf.py:/app/gunicorn.conf.py:ro
+      - ./config/app/config.toml:/app/config.toml:ro
+      - ${ORGDATA_DIR}:/data/orgs
+      - ${ORGDATA_TMP_DIR}:/data/tempfiles
+    environment:
+      APP_LOG_LEVEL: "${APP_LOG_LEVEL:-INFO}"
+      INSTANCE_FOR_DYNACONF: source.common.app_config.config
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
+      DATABASE_URI: "mysql://app_user:app_user@mysql:3306/app"
+      MONGO_URI: "mongodb://app_user:app_user@mongodb:27017/chats?authSource=admin"
+      MONGO_DATABASE: chats
+      TASKS_CELERY_BROKER_URI: "redis://redis:6379/0"
+      TASKS_CELERY_RESULT_BACKEND: "mongodb://app_user:app_user@mongodb:27017/tasks?authSource=admin"
+      FRONTEND_URL: "https://${APP_HOSTNAME}"
+      EXT_FILES_URL: "https://${APP_HOSTNAME}/extfiles/<filename>"
+      STATIC_FILES_HOST: "https://${API_HOSTNAME}"
+      UPLOADS_BASE_DIR: /data/orgs
+      ORG_TEMP_BASE_DIR: /data/tempfiles
+      JWT_ISS: "https://${APP_HOSTNAME}"
+      JWT_SECRET: ${API_JWT_SECRET}
+      MSAUTH_CLIENT_ID: ${API_MSAUTH_CLIENT_ID}
+      MSAUTH_CLIENT_SECRET: ${API_MSAUTH_CLIENT_SECRET}
+      MSAUTH_REDIRECT_URI: "https://${API_HOSTNAME}/api/v2/login/msoauth/callback"
+      MSAUTH_AUTHORITY: "https://login.microsoftonline.com/common"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      VECTORIZER_QUEUE_URI: "redis://redis:6379/2"
+      OPENAI_ORGANIZATION: ${OPENAI_ORGANIZATION}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: https://api.openai.com/v1
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      LLM_BASE_URL: https://api.together.xyz/v1
+      LLM_API_KEY: ${API_LLM_API_KEY}
+      LLM_MODEL: gpt-4o
+      EMBEDDING_MODEL: text-embedding-3-small
+      PORTKEY_API_KEY: ${API_PORTKEY_API_KEY}
+      TOGETHER_API_KEY: ${API_TOGETHER_API_KEY}
+      PINECONE_VIEWER_TOKEN: ${API_PINECONE_VIEWER_TOKEN}
+      METASEARCH_BATCH_SIZE: 2
+      METASEARCH_NER_FILTER_BATCH_SIZE: 100
+      CALLAI_STREAMING_TEMPERATURE: 0
+      CALLAI_TEMPERATURE: 0
+      CALLAI_JSON_TEMPERATURE: 0
+      CALLAI_ASYNC_TEMPERATURE: 0
+      MAX_ALLOWED_TOKENS: 1000
+      ALLOWED_TOKENS_FOR_CHUNK: 1000
+      SINGLE_MERGE_DURATION: 10
+      DOCANALYSIS_MAX_CHAR_COUNT: 20000
+      ASKDOC_CONTEXT_PROMPT_MAX_CHAR_COUNT: 32000
+      ASKDOC_CONTEXT_PROMPT_TOPK: 40
+      ASKDOC_CONTEXT_NUM_PAGES: 10
+      ASKDOC_PERCENTAGE_OF_BM25_PAGES: 0.6
+      WHATSAPP_REPLY_URL: https://graph.facebook.com/v21.0/461637950363553/messages
+      WHATSAPP_ACCESS_TOKEN: ${API_WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_VERIFY_TOKEN: ${API_WHATSAPP_VERIFY_TOKEN}
+      GMAIL_PWD: ${GMAIL_PWD}
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://127.0.0.1:8000/healthcheck" ]
+      interval: 5m
+      timeout: 5s
+      start_period: 20s # Needed for start_interval to work (don't set lower than 20s)
+      start_interval: 10s # So the initial healthcheck happens sooner
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "${API_CPUS_LIMIT:-1.5}"
+
+  db-migrator:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/db-migrator:${API_IMAGE_TAG}
+    environment:
+      DATABASE_URI: "mysql://app_user:app_user@mysql:3306/app"
+    profiles: [ 'cli' ]
+    restart: no
+
+  tasks-worker:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/tasks-worker:${API_IMAGE_TAG}
+    volumes:
+      - ${ORGDATA_DIR}:/data/orgs
+      - ${ORGDATA_TMP_DIR}:/data/tempfiles
+    environment:
+      TASKS_CELERY_BROKER_URI: "redis://redis:6379/0"
+      TASKS_CELERY_RESULT_BACKEND: "mongodb://app_user:app_user@mongodb:27017/tasks?authSource=admin"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: always
+
+  tasks-scheduler:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/tasks-scheduler:${API_IMAGE_TAG}
+    environment:
+      TASKS_CELERY_BROKER_URI: "redis://redis:6379/0"
+      TASKS_SCHEDULER_REDBEAT_REDIS_URI: "redis://redis:6379/1"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  internal-api:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/internal-api:${API_IMAGE_TAG}
+    environment:
+      APP_LOG_LEVEL: "${APP_LOG_LEVEL:-INFO}"
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
+      DATABASE_URI: "mysql://app_user:app_user@mysql:3306/app"
+      VECTORIZER_QUEUE_URI: "redis://redis:6379/2"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: always
+
+  instance-manager:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/instance-manager:${API_IMAGE_TAG}
+    volumes:
+      - ./config/internal_auth/internal-users.htpasswd:/app/internal-users.htpasswd:ro
+    environment:
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
+      DATABASE_URI: "mysql://app_user:app_user@mysql:3306/app"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: always
+
+  qa-tool:
+    image: processwiz/qa-tool:latest
+    pull_policy: never
+    volumes:
+      - ./config/internal_auth/internal-users.htpasswd:/app/internal-users.htpasswd:ro
+    environment:
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
+      DATABASE_URI: "mysql://app_user:app_user@mysql:3306/app"
+      MONGO_URI: "mongodb://app_user:app_user@mongodb:27017/chats?authSource=admin"
+      MONGO_DATABASE: chats
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: always
+
+  vectorizer:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/vectorizer:${VECTORIZER_IMAGE_TAG}
+    volumes:
+      - ${ORGDATA_DIR}:/data/orgs
+    environment:
+      VECTORIZER_TASKS_CELERY_BROKER_URI: "redis://redis:6379/2"
+      HISTORY_MONGODB_URI: "mongodb://app_user:app_user@mongodb:27017/vectorizer?authSource=admin"
+      UPLOADS_BASE_DIR: /data/orgs
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MYSQL_URI: "mysql://app_user:app_user@mysql:3306/app"
+      OPENAI_MAX_TOKEN: 200000
+      LLM_MODEL: "gpt-4-turbo-preview"
+      EMBED_MODEL: text-embedding-3-small
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  uploads-watcher:
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/uploads-watcher:${UPLOADS_PROCESSOR_IMAGE_TAG}
+    volumes:
+      - ${ORGDATA_DIR}:/uploads
+    environment:
+      VECTORIZER_TASKS_CELERY_BROKER_URI: "redis://redis:6379/2"
+      NOOP_CELERY_RESULT_BACKEND_URI: "redis://redis:6379/15"
+      PW_CORE_API_URL: "http://api:8000"
+      PW_CORE_API_KEY: ${UPLOADS_WATCHER_PW_CORE_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  botadmin:
+    image: processwiz/botadmin:${BOTADMIN_IMAGE_TAG}
+    pull_policy: never
+    volumes:
+      - ./config/botadmin/config.json:/usr/share/nginx/html/config.json:ro
+    restart: always

@@ -1,0 +1,9 @@
+{
+  "apiBaseUrl": "https://api.pwdev.internal.nlightnconsulting.com/api/v2/",
+  "logoUrl": "/assets/brand-assets/apf-logo.png",
+  "nzPrimaryColor": "#1463db",
+  "backgroundColor1": "#878ac255",
+  "backgroundColor2": "#878ac2",
+  "folderIconColor": "#1463db",
+  "highlightBackgroundColor": "#b5cef3"
+}

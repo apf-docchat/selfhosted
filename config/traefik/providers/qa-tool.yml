@@ -1,0 +1,15 @@
+http:
+  services:
+    qa-tool:
+      loadBalancer:
+        servers:
+          - url: "http://qa-tool:8000"
+
+  routers:
+    qa-tool:
+      rule: 'Host(`qa-tool.{{env "APP_HOSTNAME"}}`)'
+      service: qa-tool
+      entryPoints:
+        - "websecure"
+      tls:
+        certResolver: "letsencrypt"

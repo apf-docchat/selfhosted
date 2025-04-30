@@ -1,0 +1,15 @@
+http:
+  services:
+    instance-manager:
+      loadBalancer:
+        servers:
+          - url: "http://instance-manager:8000"
+
+  routers:
+    instance-manager:
+      rule: 'Host(`manage.{{env "APP_HOSTNAME"}}`)'
+      service: instance-manager
+      entryPoints:
+        - "websecure"
+      tls:
+        certResolver: "letsencrypt"

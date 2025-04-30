@@ -1,0 +1,15 @@
+.env
+*.htpasswd
+
+.idea
+
+/repos
+!/repos/.gitkeep
+
+/mounted_data
+
+/output
+
+config/webapp/envconfig.json
+
+config/botadmin/config.json

@@ -1,0 +1,41 @@
+http:
+  services:
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"
+
+  routers:
+    api:
+      rule: 'Host(`{{env "API_HOSTNAME"}}`)'
+      service: api
+      entryPoints:
+        - "websecure"
+      middlewares:
+        - "corsHeaders"
+      tls:
+        certResolver: "letsencrypt"
+
+  middlewares:
+    corsHeaders:
+      headers:
+        accessControlAllowMethods:
+          - "OPTIONS"
+          - "HEAD"
+          - "CONNECT"
+          - "TRACE"
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "PATCH"
+          - "DELETE"
+        accessControlAllowHeaders: "*"
+        accessControlAllowOriginList:
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    compressResponse:
+      compress:
+        excludedContentTypes:
+          - text/event-stream
