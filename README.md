@@ -62,5 +62,5 @@ docker compose up -d mysql mongodb redis
 7. Start rest of the services
 
 ```shell
-docker compose up -d mysql mongodb redis
+docker compose up -d
 ```

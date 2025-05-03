@@ -30,7 +30,7 @@ services:
     volumes:
       - ./mounted_data/mysql:/var/lib/mysql
       - ./config/mysql/conf.d:/etc/mysql/conf.d:ro
-      - ./config/mysql/intidb.d:/docker-entrypoint-initdb.d:ro
+      - ./config/mysql/initdb.d:/docker-entrypoint-initdb.d:ro
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=app
