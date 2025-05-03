@@ -53,10 +53,14 @@ cp config/webapp/envconfig.json.example config/webapp/envconfig.json
 cp config/botadmin/config.json.example config/botadmin/config.json
 ```
 
-3. Start backing services
+6. Start backing services
 
 ```shell
 docker compose up -d mysql mongodb redis
 ```
 
-4. Start all services `docker compose up -d`
+7. Start rest of the services
+
+```shell
+docker compose up -d mysql mongodb redis
+```

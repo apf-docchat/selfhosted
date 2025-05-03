@@ -258,8 +258,7 @@ services:
     restart: always
 
   qa-tool:
-    image: processwiz/qa-tool:latest
-    pull_policy: never
+    image: 496114898180.dkr.ecr.ap-south-1.amazonaws.com/processwiz/qa-tool:${API_IMAGE_TAG}
     volumes:
       - ./config/internal_auth/internal-users.htpasswd:/app/internal-users.htpasswd:ro
     environment:
