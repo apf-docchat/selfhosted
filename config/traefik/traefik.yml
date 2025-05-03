@@ -23,7 +23,7 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web
       storage: /letsencrypt/acme.json
-      email: ops@nlightn.in
+      email: ops@example.com
 
 providers:
   file:

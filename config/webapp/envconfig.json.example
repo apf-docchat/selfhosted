@@ -1,5 +1,5 @@
 {
-  "apiBaseUrl": "https://api.pwdev.internal.nlightnconsulting.com/api/v2/",
+  "apiBaseUrl": "https://api.docchat.example.com/api/v2/",
   "logoUrl": "/assets/brand-assets/apf-logo.png",
   "nzPrimaryColor": "#1463db",
   "backgroundColor1": "#878ac255",
